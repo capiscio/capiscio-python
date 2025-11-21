@@ -36,9 +36,12 @@ def main():
                 console.print(f"capiscio-python wrapper v{v}")
             except Exception:
                 console.print("capiscio-python wrapper (unknown version)")
-            # We don't exit here, we let it fall through to core so core can print its version too if needed
-            # But usually --version is exclusive. Let's just exit.
             sys.exit(0)
+        
+        # If we handled a wrapper command, we shouldn't reach here if we used sys.exit
+        # But if we didn't use sys.exit (e.g. in a test mock), we need to return
+        if args[0].startswith("--wrapper-"):
+             return
 
     # Delegate to the core binary
     sys.exit(run_core(args))
