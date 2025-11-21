@@ -30,6 +30,13 @@ dependencies = [
     "requests>=2.31.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "build",
+    "twine",
+]
+
 [project.scripts]
 capiscio = "capiscio.cli:main"
 
