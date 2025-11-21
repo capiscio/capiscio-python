@@ -17,7 +17,7 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 # Configuration
-CORE_VERSION = "1.0.2"  # Matches the python package version
+CORE_VERSION = "1.0.2"  # The version of the core binary to download
 GITHUB_REPO = "capiscio/capiscio-core"
 BINARY_NAME = "capiscio"
 
