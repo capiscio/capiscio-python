@@ -30,5 +30,5 @@ The **CapiscIO Python CLI** is a lightweight wrapper around the CapiscIO Core bi
 ## Installation
 
 ```bash
-pip install capiscio-cli
+pip install capiscio
 ```
