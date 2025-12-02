@@ -20,8 +20,27 @@ $ capiscio --wrapper-clean
 Cleaned cache directory: /Users/username/Library/Caches/capiscio/bin
 ```
 
-## Environment Variables
+---
 
-| Variable | Description |
-|----------|-------------|
-| `CAPISCIO_CORE_PATH` | (Optional) Override the path to the `capiscio-core` binary. If set, the wrapper will use this binary instead of downloading one. |
+## Core Commands
+
+All other commands are passed directly to the `capiscio-core` binary. See the [CLI Reference](https://docs.capisc.io/reference/cli/) for full documentation.
+
+### Common Commands
+
+```bash
+# Validate an agent card
+capiscio validate ./agent-card.json
+
+# Validate with JSON output
+capiscio validate ./agent-card.json --json
+
+# Validate with live endpoint testing
+capiscio validate https://agent.example.com --test-live
+
+# Check version of the core binary
+capiscio version
+
+# Generate a signing key
+capiscio key gen --output ./my-key.jwk
+```
