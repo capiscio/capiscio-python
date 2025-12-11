@@ -1,7 +1,5 @@
 """Tests for capiscio.manager module."""
 import os
-import stat
-import sys
 import platform
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
