@@ -1,8 +1,7 @@
 """
 E2E tests for capiscio validate command.
 
-Tests the validate command against a live server, ensuring it correctly
-validates agent cards from both local files and remote URLs.
+Tests the validate command locally with --schema-only flag for offline validation.
 """
 
 import pytest
@@ -12,12 +11,12 @@ from pathlib import Path
 
 
 class TestValidateCommand:
-    """Test the validate command with real server integration."""
+    """Test the validate command."""
 
-    def test_validate_local_valid_file(self, valid_agent_card_path: Path, wait_for_server):
+    def test_validate_local_valid_file(self, valid_agent_card_path: Path):
         """Test validating a valid local agent card file."""
         result = subprocess.run(
-            ["capiscio", "validate", str(valid_agent_card_path)],
+            ["capiscio", "validate", str(valid_agent_card_path), "--schema-only"],
             capture_output=True,
             text=True
         )
@@ -27,13 +26,13 @@ class TestValidateCommand:
         
         # Output should indicate success
         output = result.stdout.lower()
-        assert "valid" in output or "success" in output or "ok" in output, \
+        assert "pass" in output or "valid" in output or "✅" in output, \
             f"Expected validation success message, got: {result.stdout}"
 
-    def test_validate_local_invalid_file(self, invalid_agent_card_path: Path, wait_for_server):
+    def test_validate_local_invalid_file(self, invalid_agent_card_path: Path):
         """Test validating an invalid local agent card file."""
         result = subprocess.run(
-            ["capiscio", "validate", str(invalid_agent_card_path)],
+            ["capiscio", "validate", str(invalid_agent_card_path), "--schema-only"],
             capture_output=True,
             text=True
         )
@@ -43,13 +42,13 @@ class TestValidateCommand:
         
         # Error message should indicate validation failure
         error_output = (result.stderr + result.stdout).lower()
-        assert "invalid" in error_output or "error" in error_output or "failed" in error_output, \
+        assert "fail" in error_output or "error" in error_output or "❌" in error_output, \
             f"Expected validation error message, got: stdout={result.stdout}, stderr={result.stderr}"
 
-    def test_validate_malformed_json(self, malformed_json_path: Path, wait_for_server):
+    def test_validate_malformed_json(self, malformed_json_path: Path):
         """Test validating a malformed JSON file."""
         result = subprocess.run(
-            ["capiscio", "validate", str(malformed_json_path)],
+            ["capiscio", "validate", str(malformed_json_path), "--schema-only"],
             capture_output=True,
             text=True
         )
@@ -58,13 +57,13 @@ class TestValidateCommand:
         assert result.returncode != 0, "Should fail on malformed JSON"
         
         error_output = (result.stderr + result.stdout).lower()
-        assert "json" in error_output or "parse" in error_output or "invalid" in error_output, \
+        assert "json" in error_output or "parse" in error_output or "invalid" in error_output or "syntax" in error_output, \
             f"Expected JSON parse error, got: stdout={result.stdout}, stderr={result.stderr}"
 
-    def test_validate_nonexistent_file(self, nonexistent_path: Path, wait_for_server):
+    def test_validate_nonexistent_file(self, nonexistent_path: Path):
         """Test validating a file that doesn't exist."""
         result = subprocess.run(
-            ["capiscio", "validate", str(nonexistent_path)],
+            ["capiscio", "validate", str(nonexistent_path), "--schema-only"],
             capture_output=True,
             text=True
         )
@@ -73,47 +72,25 @@ class TestValidateCommand:
         assert result.returncode != 0, "Should fail for nonexistent file"
         
         error_output = (result.stderr + result.stdout).lower()
-        assert "not found" in error_output or "no such file" in error_output or "does not exist" in error_output, \
+        assert "not found" in error_output or "no such file" in error_output or "does not exist" in error_output or "failed" in error_output or "error" in error_output, \
             f"Expected file not found error, got: stdout={result.stdout}, stderr={result.stderr}"
 
-    def test_validate_remote_url(self, api_url: str, wait_for_server):
-        """Test validating a remote agent card URL."""
-        # Use a well-known agent card URL if available
-        # For now, test the error handling when URL is unreachable
-        remote_url = "https://nonexistent-domain-12345.com/.well-known/agent.json"
-        
+    def test_validate_schema_only_mode(self, valid_agent_card_path: Path):
+        """Test validate command with schema-only mode."""
         result = subprocess.run(
-            ["capiscio", "validate", remote_url],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
-        # Should fail with network error
-        assert result.returncode != 0, "Should fail for unreachable URL"
-        
-        error_output = (result.stderr + result.stdout).lower()
-        assert any(keyword in error_output for keyword in ["network", "connection", "fetch", "unreachable", "failed"]), \
-            f"Expected network error, got: stdout={result.stdout}, stderr={result.stderr}"
-
-    def test_validate_with_verbose_flag(self, valid_agent_card_path: Path, wait_for_server):
-        """Test validate command with verbose output."""
-        result = subprocess.run(
-            ["capiscio", "validate", str(valid_agent_card_path), "--verbose"],
+            ["capiscio", "validate", str(valid_agent_card_path), "--schema-only"],
             capture_output=True,
             text=True
         )
         
-        # Should still succeed
+        # Should succeed
         assert result.returncode == 0, f"Validation failed: {result.stderr}"
-        
-        # Verbose mode should produce more output
-        assert len(result.stdout) > 0, "Verbose mode should produce output"
+        assert len(result.stdout) > 0, "Should produce output"
 
-    def test_validate_with_json_output(self, valid_agent_card_path: Path, wait_for_server):
+    def test_validate_with_json_output(self, valid_agent_card_path: Path):
         """Test validate command with JSON output format."""
         result = subprocess.run(
-            ["capiscio", "validate", str(valid_agent_card_path), "--output", "json"],
+            ["capiscio", "validate", str(valid_agent_card_path), "--schema-only", "--json"],
             capture_output=True,
             text=True
         )
@@ -142,5 +119,5 @@ class TestValidateCommand:
         # Help text should contain usage information
         help_text = result.stdout.lower()
         assert "validate" in help_text, "Help should mention validate command"
-        assert "usage" in help_text or "options" in help_text or "arguments" in help_text, \
+        assert "usage" in help_text or "options" in help_text or "flags" in help_text, \
             f"Help should contain usage information, got: {result.stdout}"

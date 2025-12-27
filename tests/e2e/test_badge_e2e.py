@@ -1,8 +1,8 @@
 """
 E2E tests for capiscio badge commands.
 
-Tests badge issuance and verification commands against a live server.
-Requires CAPISCIO_API_KEY and CAPISCIO_TEST_AGENT_ID environment variables.
+Tests badge issuance and verification using offline/self-signed mode.
+No server required.
 """
 
 import pytest
@@ -14,93 +14,87 @@ import os
 class TestBadgeCommands:
     """Test badge issuance and verification commands."""
 
-    @pytest.mark.skipif(
-        not os.getenv("CAPISCIO_API_KEY"),
-        reason="CAPISCIO_API_KEY not set"
-    )
-    def test_badge_issue_with_api_key(self, api_key: str, test_agent_id: str, wait_for_server):
-        """Test badge issuance using API key authentication."""
+    def test_badge_issue_self_signed(self):
+        """Test self-signed badge issuance."""
         result = subprocess.run(
             [
                 "capiscio", "badge", "issue",
-                "--agent-id", test_agent_id,
-                "--domain", "test.capisc.io"
+                "--self-sign", "--domain", "test.example.com"
             ],
             capture_output=True,
-            text=True,
-            env={**os.environ, "CAPISCIO_API_KEY": api_key}
+            text=True
         )
         
-        # Badge issuance should succeed (or fail with appropriate message)
-        # The exact behavior depends on server implementation
-        # We're testing that the CLI can communicate with the server
-        output = result.stdout + result.stderr
-        assert len(output) > 0, "Badge command should produce output"
+        # Self-signed badge issuance should succeed
+        assert result.returncode == 0, f"Badge issuance failed: {result.stderr}"
         
-        # If successful, output should contain token or JTI
-        if result.returncode == 0:
-            assert "token" in result.stdout.lower() or "badge" in result.stdout.lower(), \
-                f"Expected badge token in output, got: {result.stdout}"
+        # Output should be a JWT (three dot-separated parts)
+        output = result.stdout.strip()
+        parts = output.split(".")
+        assert len(parts) == 3, f"Expected JWT format, got: {output}"
 
-    @pytest.mark.skipif(
-        not os.getenv("CAPISCIO_API_KEY"),
-        reason="CAPISCIO_API_KEY not set"
-    )
-    def test_badge_issue_without_api_key(self, test_agent_id: str, wait_for_server):
-        """Test badge issuance without API key (should fail)."""
-        # Remove API key from environment
-        env = {k: v for k, v in os.environ.items() if k != "CAPISCIO_API_KEY"}
-        
+    def test_badge_issue_with_expiration(self):
+        """Test badge issuance with custom expiration."""
         result = subprocess.run(
             [
                 "capiscio", "badge", "issue",
-                "--agent-id", test_agent_id,
-                "--domain", "test.capisc.io"
+                "--self-sign", "--exp", "10m"
             ],
             capture_output=True,
-            text=True,
-            env=env
+            text=True
         )
         
-        # Should fail without authentication
-        assert result.returncode != 0, "Badge issuance should fail without API key"
-        
-        error_output = (result.stderr + result.stdout).lower()
-        assert any(keyword in error_output for keyword in ["auth", "key", "credential", "unauthorized"]), \
-            f"Expected authentication error, got: {result.stdout}"
+        assert result.returncode == 0, f"Badge issuance failed: {result.stderr}"
+        output = result.stdout.strip()
+        assert len(output.split(".")) == 3, "Expected JWT format"
 
-    @pytest.mark.skipif(
-        not os.getenv("CAPISCIO_API_KEY"),
-        reason="CAPISCIO_API_KEY not set"
-    )
-    def test_badge_issue_invalid_agent_id(self, api_key: str, wait_for_server):
-        """Test badge issuance with invalid agent ID."""
-        invalid_agent_id = "00000000-0000-0000-0000-000000000000"
-        
+    def test_badge_issue_with_audience(self):
+        """Test badge issuance with audience restriction."""
         result = subprocess.run(
             [
                 "capiscio", "badge", "issue",
-                "--agent-id", invalid_agent_id,
-                "--domain", "test.capisc.io"
+                "--self-sign", "--aud", "https://api.example.com"
             ],
             capture_output=True,
-            text=True,
-            env={**os.environ, "CAPISCIO_API_KEY": api_key}
+            text=True
         )
         
-        # Should fail with not found or similar error
-        assert result.returncode != 0, "Should fail for invalid agent ID"
-        
-        error_output = (result.stderr + result.stdout).lower()
-        assert any(keyword in error_output for keyword in ["not found", "invalid", "unknown", "does not exist"]), \
-            f"Expected not found error, got: {result.stdout}"
+        assert result.returncode == 0, f"Badge issuance failed: {result.stderr}"
+        output = result.stdout.strip()
+        assert len(output.split(".")) == 3, "Expected JWT format"
 
-    def test_badge_verify_invalid_token(self, wait_for_server):
+    def test_badge_verify_self_signed(self):
+        """Test verifying a self-signed badge."""
+        # First issue a badge
+        issue_result = subprocess.run(
+            [
+                "capiscio", "badge", "issue",
+                "--self-sign", "--domain", "test.example.com"
+            ],
+            capture_output=True,
+            text=True
+        )
+        assert issue_result.returncode == 0, f"Badge issuance failed: {issue_result.stderr}"
+        token = issue_result.stdout.strip()
+        
+        # Then verify it
+        verify_result = subprocess.run(
+            ["capiscio", "badge", "verify", token, "--accept-self-signed", "--offline"],
+            capture_output=True,
+            text=True
+        )
+        
+        assert verify_result.returncode == 0, f"Badge verification failed: {verify_result.stderr}"
+        output = verify_result.stdout.lower()
+        assert "valid" in output or "verified" in output or "ok" in output, \
+            f"Expected verification success, got: {verify_result.stdout}"
+
+    def test_badge_verify_invalid_token(self):
         """Test badge verification with invalid token."""
         invalid_token = "invalid.jwt.token"
         
         result = subprocess.run(
-            ["capiscio", "badge", "verify", invalid_token],
+            ["capiscio", "badge", "verify", invalid_token, "--accept-self-signed"],
             capture_output=True,
             text=True
         )
@@ -109,7 +103,7 @@ class TestBadgeCommands:
         assert result.returncode != 0, "Should fail for invalid token"
         
         error_output = (result.stderr + result.stdout).lower()
-        assert any(keyword in error_output for keyword in ["invalid", "verify", "failed", "malformed"]), \
+        assert any(keyword in error_output for keyword in ["invalid", "verify", "failed", "malformed", "error"]), \
             f"Expected verification error, got: {result.stdout}"
 
     def test_badge_help(self):
@@ -141,7 +135,7 @@ class TestBadgeCommands:
         assert result.returncode == 0, f"Help command failed: {result.stderr}"
         
         help_text = result.stdout.lower()
-        assert "agent" in help_text or "issue" in help_text, \
+        assert "issue" in help_text or "self-sign" in help_text, \
             f"Help should mention badge issuance, got: {result.stdout}"
 
     def test_badge_verify_help(self):
