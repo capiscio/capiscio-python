@@ -7,7 +7,6 @@ Provides fixtures for testing the CLI offline using:
 - badge verify --accept-self-signed --offline
 """
 
-import os
 import pytest
 from pathlib import Path
 
@@ -33,7 +32,7 @@ def invalid_agent_card_path(fixtures_dir: Path) -> Path:
 @pytest.fixture
 def malformed_json_path(fixtures_dir: Path) -> Path:
     """Path to malformed JSON fixture."""
-    return fixtures_dir / "malformed.json"
+    return fixtures_dir / "malformed.txt"
 
 
 @pytest.fixture

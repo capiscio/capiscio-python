@@ -7,8 +7,6 @@ No server required.
 
 import pytest
 import subprocess
-import json
-import os
 
 
 class TestBadgeCommands:
