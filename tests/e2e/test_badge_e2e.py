@@ -28,8 +28,11 @@ class TestBadgeCommands:
         # Self-signed badge issuance should succeed
         assert result.returncode == 0, f"Badge issuance failed: {result.stderr}"
         
+        # Output might include download messages on first run, get last line
+        lines = result.stdout.strip().split('\n')
+        output = lines[-1].strip()
+        
         # Output should be a JWT (three dot-separated parts)
-        output = result.stdout.strip()
         parts = output.split(".")
         assert len(parts) == 3, f"Expected JWT format, got: {output}"
 
@@ -45,7 +48,8 @@ class TestBadgeCommands:
         )
         
         assert result.returncode == 0, f"Badge issuance failed: {result.stderr}"
-        output = result.stdout.strip()
+        lines = result.stdout.strip().split('\n')
+        output = lines[-1].strip()
         assert len(output.split(".")) == 3, "Expected JWT format"
 
     def test_badge_issue_with_audience(self):
@@ -60,7 +64,8 @@ class TestBadgeCommands:
         )
         
         assert result.returncode == 0, f"Badge issuance failed: {result.stderr}"
-        output = result.stdout.strip()
+        lines = result.stdout.strip().split('\n')
+        output = lines[-1].strip()
         assert len(output.split(".")) == 3, "Expected JWT format"
 
     def test_badge_verify_self_signed(self):
@@ -75,7 +80,9 @@ class TestBadgeCommands:
             text=True
         )
         assert issue_result.returncode == 0, f"Badge issuance failed: {issue_result.stderr}"
-        token = issue_result.stdout.strip()
+        # Get token from last line (may have download messages on first run)
+        lines = issue_result.stdout.strip().split('\n')
+        token = lines[-1].strip()
         
         # Then verify it
         verify_result = subprocess.run(
