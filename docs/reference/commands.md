@@ -39,8 +39,8 @@ capiscio validate ./agent-card.json --json
 capiscio validate https://agent.example.com --test-live
 
 # Check version of the core binary
-capiscio version
+capiscio --version
 
-# Generate a signing key
-capiscio key gen --output ./my-key.jwk
+# Generate a signing key pair
+capiscio key gen --out-priv ./private.jwk --out-pub ./public.jwk
 ```

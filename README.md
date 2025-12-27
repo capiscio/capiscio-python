@@ -27,11 +27,11 @@ Once installed, the `capiscio` command is available in your terminal. It passes 
 # Validate an agent
 capiscio validate https://my-agent.example.com
 
-# Validate with JSON output (includes scores)
+# Validate with JSON output
 capiscio validate https://my-agent.example.com --json
 
 # Check version
-capiscio version
+capiscio --version
 ```
 
 ### Wrapper Utilities
