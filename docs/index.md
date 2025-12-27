@@ -39,11 +39,11 @@ pip install capiscio
 # Validate an agent card
 capiscio validate ./agent-card.json
 
-# Validate with JSON output (includes scores)
+# Validate with JSON output
 capiscio validate ./agent-card.json --json
 
 # Check core binary version
-capiscio version
+capiscio --version
 ```
 
 ## What This Package Does

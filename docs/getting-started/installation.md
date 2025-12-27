@@ -19,7 +19,7 @@ Once installed, the `capiscio` command is available in your terminal. It passes 
 capiscio validate ./agent-card.json
 
 # Check version
-capiscio version
+capiscio --version
 ```
 
 For full command reference, see the [CapiscIO Core Documentation](../../capiscio-core/index.md).
