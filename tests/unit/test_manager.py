@@ -214,13 +214,15 @@ class TestRunCore:
     @patch.object(os, 'execv')
     def test_runs_execv_on_unix(self, mock_execv, mock_system, mock_download):
         """Test that os.execv is used on Unix systems."""
-        mock_download.return_value = Path("/bin/capiscio")
+        binary_path = Path("/tmp/capiscio")
+        mock_download.return_value = binary_path
         
         run_core(["validate", "--help"])
         
         mock_execv.assert_called_once()
         args = mock_execv.call_args[0]
-        assert args[0] == "/bin/capiscio"
+        # Compare as strings since Path normalization differs by OS
+        assert args[0] == str(binary_path)
         assert "validate" in args[1]
         assert "--help" in args[1]
 
