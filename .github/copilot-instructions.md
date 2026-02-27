@@ -15,9 +15,11 @@
 
 ## CRITICAL: Read First
 
-**Before starting work, read the workspace context files:**
+**If working inside the CapiscIO monorepo workspace that includes `.context/`, read these workspace context files before starting work:**
 1. `../../.context/CURRENT_SPRINT.md` - Sprint goals and priorities
 2. `../../.context/ACTIVE_TASKS.md` - Active tasks
+
+If these files are not present in your checkout of this repository, skip this step.
 
 ---
 
@@ -32,7 +34,7 @@ Published to PyPI as `capiscio`. Users install via `pip install capiscio`.
 
 **Technology Stack**: Python 3.10+, hatchling (build), rich (CLI output)
 
-**Current Version**: v2.4.0
+**Current Version**: v2.4.0 (wrapper); core binary version is controlled by `CORE_VERSION` in `src/capiscio/manager.py`
 **Default Branch:** `main`
 
 ## Architecture
@@ -52,9 +54,9 @@ capiscio-python/
 
 ### How It Works
 
-1. User runs `capiscio verify agent-card.json`
+1. User runs `capiscio validate agent-card.json`
 2. `cli.py` invokes `manager.run_core()` to ensure Go binary is downloaded
-3. Binary is cached in OS-specific cache dir (`get_cache_dir()`)
+3. Binary is cached in an OS-specific cache directory resolved by `get_cache_dir()`, which uses `platformdirs.user_cache_dir("capiscio", "capiscio")` and stores binaries under a versioned subdirectory
 4. All args are passed through to the Go binary via `subprocess`
 
 ## Quick Commands
@@ -70,7 +72,7 @@ uv sync                   # Sync deps with uv
 - **Never add CLI logic here** — all commands belong in capiscio-core
 - Binary downloads use GitHub Releases from `capiscio/capiscio-core`
 - Platform detection: `platform.system()` + `platform.machine()`
-- Version must stay aligned with capiscio-core
+- The `CORE_VERSION` constant in `src/capiscio/manager.py` must track the capiscio-core release tag used for the downloaded binary; the Python package version can differ
 - **Don't confuse with capiscio-sdk-python** — this is the CLI wrapper, that's the SDK
 
 ## Publishing
