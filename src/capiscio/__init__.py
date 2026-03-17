@@ -1,3 +1,5 @@
 """CapiscIO CLI package."""
 
-__version__ = "2.3.1"
+from importlib.metadata import version
+
+__version__ = version("capiscio")
