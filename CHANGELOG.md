@@ -7,18 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-03-16
+
+### Changed
+- **CORE VERSION**: Now downloads `capiscio-core` v2.5.0
+
+### Fixed
+- `CORE_VERSION` was stuck at v2.2.0 since the v2.2.0 release, meaning v2.3.0–v2.4.0 all downloaded `capiscio-core` v2.2.0 despite their changelog entries stating otherwise. This release correctly aligns the downloaded binary version.
+
 ## [2.4.0] - 2026-01-18
 
 ### Changed
-- **CORE VERSION**: Now downloads `capiscio-core` v2.4.0
+- Bump package version to 2.4.0
+- **Note:** `CORE_VERSION` was incorrectly left at v2.2.0 (fixed in v2.5.0)
 
 ## [2.3.1] - 2025-01-14
 
-### Changed
-- **CORE VERSION**: Now downloads `capiscio-core` v2.3.1
-
 ### Fixed
 - Aligned all version references across package metadata
+- **Note:** `CORE_VERSION` was incorrectly left at v2.2.0 (fixed in v2.5.0)
 
 ## [2.3.0] - 2025-01-13
 
@@ -29,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI Command Syntax**: Fixed incorrect command syntax in documentation
 
 ### Changed
-- **CORE VERSION**: Now downloads `capiscio-core` v2.3.0
+- Bump package version to 2.3.0
+- **Note:** `CORE_VERSION` was incorrectly left at v2.2.0 (fixed in v2.5.0)
 
 ## [2.2.0] - 2025-12-10
 
