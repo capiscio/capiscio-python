@@ -1,5 +1,6 @@
 import os
 import sys
+import hashlib
 import platform
 import stat
 import shutil
@@ -68,6 +69,34 @@ def get_binary_path(version: str) -> Path:
     # For now, let's put it in a versioned folder
     return get_cache_dir() / version / filename
 
+def _fetch_expected_checksum(version: str, filename: str) -> Optional[str]:
+    """Fetch the expected SHA-256 checksum from the release checksums.txt."""
+    url = f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/checksums.txt"
+    try:
+        resp = requests.get(url, timeout=30)
+        resp.raise_for_status()
+        for line in resp.text.strip().splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[1] == filename:
+                return parts[0]
+        logger.warning(f"Binary {filename} not found in checksums.txt")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Could not fetch checksums.txt: {e}")
+        return None
+
+def _verify_checksum(file_path: Path, expected_hash: str) -> bool:
+    """Verify SHA-256 checksum of a downloaded file."""
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+    actual = sha256.hexdigest()
+    if actual != expected_hash:
+        logger.error(f"Checksum mismatch: expected {expected_hash}, got {actual}")
+        return False
+    return True
+
 def download_binary(version: str) -> Path:
     """
     Download the binary for the current platform and version.
@@ -109,6 +138,23 @@ def download_binary(version: str) -> Path:
         # Make executable
         st = os.stat(target_path)
         os.chmod(target_path, st.st_mode | stat.S_IEXEC)
+        
+        # Verify checksum integrity
+        expected_hash = _fetch_expected_checksum(version, filename)
+        if expected_hash is not None:
+            if not _verify_checksum(target_path, expected_hash):
+                target_path.unlink()
+                raise RuntimeError(
+                    f"Binary integrity check failed for {filename}. "
+                    "The downloaded file does not match the published checksum. "
+                    "This may indicate a tampered or corrupted download."
+                )
+            logger.info(f"Checksum verified for {filename}")
+        else:
+            logger.warning(
+                "Could not verify binary integrity (checksums.txt not available). "
+                "Consider upgrading capiscio-core to a version that publishes checksums."
+            )
         
         console.print(f"[green]Successfully installed CapiscIO Core v{version}[/green]")
         return target_path
