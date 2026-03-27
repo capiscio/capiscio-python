@@ -17,7 +17,7 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 # Configuration
-CORE_VERSION = "2.5.0"  # The version of the core binary to download
+CORE_VERSION = "2.6.0"  # The version of the core binary to download
 GITHUB_REPO = "capiscio/capiscio-core"
 BINARY_NAME = "capiscio"
 
