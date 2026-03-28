@@ -140,6 +140,7 @@ def download_binary(version: str) -> Path:
         os.chmod(target_path, st.st_mode | stat.S_IEXEC)
         
         # Verify checksum integrity
+        require_checksum = os.environ.get("CAPISCIO_REQUIRE_CHECKSUM", "").lower() in ("1", "true", "yes")
         expected_hash = _fetch_expected_checksum(version, filename)
         if expected_hash is not None:
             if not _verify_checksum(target_path, expected_hash):
@@ -150,10 +151,17 @@ def download_binary(version: str) -> Path:
                     "This may indicate a tampered or corrupted download."
                 )
             logger.info(f"Checksum verified for {filename}")
+        elif require_checksum:
+            target_path.unlink()
+            raise RuntimeError(
+                f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
+                f"but checksums.txt is not available for v{version}. "
+                "Cannot verify binary integrity."
+            )
         else:
             logger.warning(
                 "Could not verify binary integrity (checksums.txt not available). "
-                "Consider upgrading capiscio-core to a version that publishes checksums."
+                "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
             )
         
         console.print(f"[green]Successfully installed CapiscIO Core v{version}[/green]")
