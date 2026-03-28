@@ -12,6 +12,8 @@ from capiscio.manager import (
     get_binary_path,
     download_binary,
     run_core,
+    _fetch_expected_checksum,
+    _verify_checksum,
     CORE_VERSION,
     GITHUB_REPO,
 )
@@ -145,15 +147,17 @@ class TestDownloadBinary:
         result = download_binary("1.0.0")
         assert result == mock_path
 
+    @patch('capiscio.manager._fetch_expected_checksum', return_value=(None, "fetch_failed"))
     @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
     @patch('capiscio.manager.get_binary_path')
     @patch('capiscio.manager.requests.get')
     @patch('capiscio.manager.console')
-    def test_downloads_binary_on_missing(self, mock_console, mock_requests, mock_get_path, mock_platform):
+    def test_downloads_binary_on_missing(self, mock_console, mock_requests, mock_get_path, mock_platform, mock_fetch_checksum):
         """Test that binary is downloaded when missing."""
         mock_path = MagicMock(spec=Path)
         mock_path.exists.return_value = False
         mock_path.parent = MagicMock()
+        mock_path.name = "capiscio-linux-amd64"
         mock_get_path.return_value = mock_path
         
         # Mock the response
@@ -192,6 +196,163 @@ class TestDownloadBinary:
         
         # Verify cleanup was attempted
         mock_path.unlink.assert_called_once()
+
+
+class TestFetchExpectedChecksum:
+    """Tests for _fetch_expected_checksum function."""
+
+    @patch('capiscio.manager.requests.get')
+    def test_returns_checksum_on_match(self, mock_get):
+        """Test successful checksum lookup."""
+        mock_resp = MagicMock()
+        mock_resp.text = "abc123  capiscio-linux-amd64\ndef456  capiscio-darwin-arm64\n"
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_get.return_value = mock_resp
+
+        checksum, status = _fetch_expected_checksum("1.0.0", "capiscio-linux-amd64")
+        assert checksum == "abc123"
+        assert status == "ok"
+
+    @patch('capiscio.manager.requests.get')
+    def test_returns_entry_missing_when_not_found(self, mock_get):
+        """Test that missing entry returns entry_missing status."""
+        mock_resp = MagicMock()
+        mock_resp.text = "abc123  capiscio-linux-amd64\n"
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_get.return_value = mock_resp
+
+        checksum, status = _fetch_expected_checksum("1.0.0", "capiscio-darwin-arm64")
+        assert checksum is None
+        assert status == "entry_missing"
+
+    @patch('capiscio.manager.requests.get')
+    def test_returns_fetch_failed_on_network_error(self, mock_get):
+        """Test that network errors return fetch_failed status."""
+        import requests.exceptions
+        mock_get.side_effect = requests.exceptions.ConnectionError("timeout")
+
+        checksum, status = _fetch_expected_checksum("1.0.0", "capiscio-linux-amd64")
+        assert checksum is None
+        assert status == "fetch_failed"
+
+
+class TestChecksumVerificationIntegration:
+    """Tests for checksum verification during download."""
+
+    def _make_download_mocks(self):
+        """Helper: set up common mocks for download_binary tests."""
+        mock_path = MagicMock(spec=Path)
+        mock_path.exists.return_value = False
+        mock_path.parent = MagicMock()
+        mock_path.name = "capiscio-linux-amd64"
+        return mock_path
+
+    @patch('capiscio.manager._fetch_expected_checksum', return_value=("abc123", "ok"))
+    @patch('capiscio.manager._verify_checksum', return_value=True)
+    @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
+    @patch('capiscio.manager.get_binary_path')
+    @patch('capiscio.manager.requests.get')
+    @patch('capiscio.manager.console')
+    def test_checksum_verified_match(self, mock_console, mock_requests, mock_get_path,
+                                      mock_platform, mock_verify, mock_fetch):
+        """Test that download succeeds when checksum matches."""
+        mock_path = self._make_download_mocks()
+        mock_get_path.return_value = mock_path
+
+        mock_response = MagicMock()
+        mock_response.headers = {'content-length': '1024'}
+        mock_response.iter_content.return_value = [b'x' * 1024]
+        mock_response.__enter__ = MagicMock(return_value=mock_response)
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_requests.return_value = mock_response
+
+        with patch('builtins.open', mock_open()):
+            with patch.object(os, 'stat') as mock_stat:
+                with patch.object(os, 'chmod'):
+                    mock_stat.return_value = MagicMock(st_mode=0o644)
+                    result = download_binary("1.0.0")
+
+        assert result == mock_path
+        mock_verify.assert_called_once_with(mock_path, "abc123")
+
+    @patch('capiscio.manager._fetch_expected_checksum', return_value=("abc123", "ok"))
+    @patch('capiscio.manager._verify_checksum', return_value=False)
+    @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
+    @patch('capiscio.manager.get_binary_path')
+    @patch('capiscio.manager.requests.get')
+    @patch('capiscio.manager.console')
+    def test_checksum_mismatch_cleans_up(self, mock_console, mock_requests, mock_get_path,
+                                          mock_platform, mock_verify, mock_fetch):
+        """Test that a checksum mismatch deletes the binary and raises."""
+        mock_path = self._make_download_mocks()
+        mock_get_path.return_value = mock_path
+
+        mock_response = MagicMock()
+        mock_response.headers = {'content-length': '1024'}
+        mock_response.iter_content.return_value = [b'x' * 1024]
+        mock_response.__enter__ = MagicMock(return_value=mock_response)
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_requests.return_value = mock_response
+
+        with patch('builtins.open', mock_open()):
+            with pytest.raises(RuntimeError, match="integrity check failed"):
+                download_binary("1.0.0")
+
+        mock_path.unlink.assert_called()
+
+    @patch.dict(os.environ, {"CAPISCIO_REQUIRE_CHECKSUM": "true"})
+    @patch('capiscio.manager._fetch_expected_checksum', return_value=(None, "fetch_failed"))
+    @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
+    @patch('capiscio.manager.get_binary_path')
+    @patch('capiscio.manager.requests.get')
+    @patch('capiscio.manager.console')
+    def test_require_checksum_fails_on_fetch_failed(self, mock_console, mock_requests,
+                                                     mock_get_path, mock_platform, mock_fetch):
+        """Test fail-closed when CAPISCIO_REQUIRE_CHECKSUM=true and fetch fails."""
+        mock_path = self._make_download_mocks()
+        mock_get_path.return_value = mock_path
+
+        mock_response = MagicMock()
+        mock_response.headers = {'content-length': '1024'}
+        mock_response.iter_content.return_value = [b'x' * 1024]
+        mock_response.__enter__ = MagicMock(return_value=mock_response)
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_requests.return_value = mock_response
+
+        with patch('builtins.open', mock_open()):
+            with pytest.raises(RuntimeError, match="could not be fetched"):
+                download_binary("1.0.0")
+
+        mock_path.unlink.assert_called()
+
+    @patch.dict(os.environ, {"CAPISCIO_REQUIRE_CHECKSUM": "true"})
+    @patch('capiscio.manager._fetch_expected_checksum', return_value=(None, "entry_missing"))
+    @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
+    @patch('capiscio.manager.get_binary_path')
+    @patch('capiscio.manager.requests.get')
+    @patch('capiscio.manager.console')
+    def test_require_checksum_fails_on_entry_missing(self, mock_console, mock_requests,
+                                                      mock_get_path, mock_platform, mock_fetch):
+        """Test fail-closed when CAPISCIO_REQUIRE_CHECKSUM=true and entry is missing."""
+        mock_path = self._make_download_mocks()
+        mock_get_path.return_value = mock_path
+
+        mock_response = MagicMock()
+        mock_response.headers = {'content-length': '1024'}
+        mock_response.iter_content.return_value = [b'x' * 1024]
+        mock_response.__enter__ = MagicMock(return_value=mock_response)
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_requests.return_value = mock_response
+
+        with patch('builtins.open', mock_open()):
+            with pytest.raises(RuntimeError, match="no checksum entry found"):
+                download_binary("1.0.0")
+
+        mock_path.unlink.assert_called()
 
 
 class TestRunCore:
