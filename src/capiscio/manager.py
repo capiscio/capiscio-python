@@ -69,21 +69,28 @@ def get_binary_path(version: str) -> Path:
     # For now, let's put it in a versioned folder
     return get_cache_dir() / version / filename
 
-def _fetch_expected_checksum(version: str, filename: str) -> Optional[str]:
-    """Fetch the expected SHA-256 checksum from the release checksums.txt."""
+def _fetch_expected_checksum(version: str, filename: str) -> Tuple[Optional[str], str]:
+    """Fetch the expected SHA-256 checksum from the release checksums.txt.
+
+    Returns:
+        A tuple of (checksum, status) where status is one of:
+        - "ok"          — checksum found and returned
+        - "fetch_failed" — could not download checksums.txt
+        - "entry_missing" — checksums.txt downloaded but no entry for filename
+    """
     url = f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/checksums.txt"
     try:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-        for line in resp.text.strip().splitlines():
-            parts = line.split()
-            if len(parts) == 2 and parts[1] == filename:
-                return parts[0]
-        logger.warning(f"Binary {filename} not found in checksums.txt")
-        return None
+        with requests.get(url, timeout=30) as resp:
+            resp.raise_for_status()
+            for line in resp.text.strip().splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == filename:
+                    return parts[0], "ok"
+            logger.warning(f"Binary {filename} not found in checksums.txt")
+            return None, "entry_missing"
     except requests.exceptions.RequestException as e:
         logger.warning(f"Could not fetch checksums.txt: {e}")
-        return None
+        return None, "fetch_failed"
 
 def _verify_checksum(file_path: Path, expected_hash: str) -> bool:
     """Verify SHA-256 checksum of a downloaded file."""
@@ -135,34 +142,52 @@ def download_binary(version: str) -> Path:
                         f.write(chunk)
                         progress.update(task, advance=len(chunk))
         
-        # Make executable
-        st = os.stat(target_path)
-        os.chmod(target_path, st.st_mode | stat.S_IEXEC)
-        
-        # Verify checksum integrity
+        # Verify checksum BEFORE making executable (security: validate before trust)
+        #
+        # CAPISCIO_REQUIRE_CHECKSUM env var controls strict verification:
+        #   When set to "1", "true", or "yes", the download will fail if
+        #   checksums.txt cannot be fetched OR the binary entry is missing.
+        #   When unset/false, a warning is logged but the binary is still used.
         require_checksum = os.environ.get("CAPISCIO_REQUIRE_CHECKSUM", "").lower() in ("1", "true", "yes")
-        expected_hash = _fetch_expected_checksum(version, filename)
+        expected_hash, checksum_status = _fetch_expected_checksum(version, target_path.name)
         if expected_hash is not None:
             if not _verify_checksum(target_path, expected_hash):
                 target_path.unlink()
                 raise RuntimeError(
-                    f"Binary integrity check failed for {filename}. "
+                    f"Binary integrity check failed for {target_path.name}. "
                     "The downloaded file does not match the published checksum. "
                     "This may indicate a tampered or corrupted download."
                 )
-            logger.info(f"Checksum verified for {filename}")
+            logger.info(f"Checksum verified for {target_path.name}")
         elif require_checksum:
             target_path.unlink()
-            raise RuntimeError(
-                f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
-                f"but checksums.txt is not available for v{version}. "
-                "Cannot verify binary integrity."
-            )
+            if checksum_status == "fetch_failed":
+                raise RuntimeError(
+                    f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
+                    f"but checksums.txt could not be fetched for v{version}. "
+                    "Cannot verify binary integrity."
+                )
+            else:
+                raise RuntimeError(
+                    f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
+                    f"but no checksum entry found for {target_path.name} in v{version} checksums.txt. "
+                    "Cannot verify binary integrity."
+                )
         else:
-            logger.warning(
-                "Could not verify binary integrity (checksums.txt not available). "
-                "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
-            )
+            if checksum_status == "fetch_failed":
+                logger.warning(
+                    "Could not verify binary integrity (checksums.txt not available). "
+                    "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
+                )
+            else:
+                logger.warning(
+                    f"Could not verify binary integrity (no entry for {target_path.name} in checksums.txt). "
+                    "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
+                )
+
+        # Make executable only after checksum verification passes
+        st = os.stat(target_path)
+        os.chmod(target_path, st.st_mode | stat.S_IEXEC)
         
         console.print(f"[green]Successfully installed CapiscIO Core v{version}[/green]")
         return target_path
