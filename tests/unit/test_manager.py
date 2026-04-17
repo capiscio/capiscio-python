@@ -147,13 +147,14 @@ class TestDownloadBinary:
         result = download_binary("1.0.0")
         assert result == mock_path
 
+    @patch.dict(os.environ, {"CAPISCIO_SKIP_CHECKSUM": "true"})
     @patch('capiscio.manager._fetch_expected_checksum', return_value=(None, "fetch_failed"))
     @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
     @patch('capiscio.manager.get_binary_path')
     @patch('capiscio.manager.requests.get')
     @patch('capiscio.manager.console')
     def test_downloads_binary_on_missing(self, mock_console, mock_requests, mock_get_path, mock_platform, mock_fetch_checksum):
-        """Test that binary is downloaded when missing."""
+        """Test that binary is downloaded when missing (with checksum skip)."""
         mock_path = MagicMock(spec=Path)
         mock_path.exists.return_value = False
         mock_path.parent = MagicMock()
@@ -304,15 +305,14 @@ class TestChecksumVerificationIntegration:
 
         mock_path.unlink.assert_called()
 
-    @patch.dict(os.environ, {"CAPISCIO_REQUIRE_CHECKSUM": "true"})
     @patch('capiscio.manager._fetch_expected_checksum', return_value=(None, "fetch_failed"))
     @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
     @patch('capiscio.manager.get_binary_path')
     @patch('capiscio.manager.requests.get')
     @patch('capiscio.manager.console')
-    def test_require_checksum_fails_on_fetch_failed(self, mock_console, mock_requests,
-                                                     mock_get_path, mock_platform, mock_fetch):
-        """Test fail-closed when CAPISCIO_REQUIRE_CHECKSUM=true and fetch fails."""
+    def test_fail_closed_on_fetch_failed(self, mock_console, mock_requests,
+                                          mock_get_path, mock_platform, mock_fetch):
+        """Test fail-closed when checksums.txt fetch fails (default behavior)."""
         mock_path = self._make_download_mocks()
         mock_get_path.return_value = mock_path
 
@@ -329,15 +329,14 @@ class TestChecksumVerificationIntegration:
 
         mock_path.unlink.assert_called()
 
-    @patch.dict(os.environ, {"CAPISCIO_REQUIRE_CHECKSUM": "true"})
     @patch('capiscio.manager._fetch_expected_checksum', return_value=(None, "entry_missing"))
     @patch('capiscio.manager.get_platform_info', return_value=('linux', 'amd64'))
     @patch('capiscio.manager.get_binary_path')
     @patch('capiscio.manager.requests.get')
     @patch('capiscio.manager.console')
-    def test_require_checksum_fails_on_entry_missing(self, mock_console, mock_requests,
-                                                      mock_get_path, mock_platform, mock_fetch):
-        """Test fail-closed when CAPISCIO_REQUIRE_CHECKSUM=true and entry is missing."""
+    def test_fail_closed_on_entry_missing(self, mock_console, mock_requests,
+                                           mock_get_path, mock_platform, mock_fetch):
+        """Test fail-closed when entry is missing in checksums.txt (default behavior)."""
         mock_path = self._make_download_mocks()
         mock_get_path.return_value = mock_path
 
@@ -349,7 +348,7 @@ class TestChecksumVerificationIntegration:
         mock_requests.return_value = mock_response
 
         with patch('builtins.open', mock_open()):
-            with pytest.raises(RuntimeError, match="no checksum entry found"):
+            with pytest.raises(RuntimeError, match="no entry for"):
                 download_binary("1.0.0")
 
         mock_path.unlink.assert_called()
