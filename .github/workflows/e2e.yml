@@ -36,6 +36,9 @@ jobs:
       - name: Run E2E tests
         run: |
           pytest tests/e2e/ -v --tb=short
+        env:
+          # No releases currently include checksums.txt
+          CAPISCIO_SKIP_CHECKSUM: 'true'
       
       - name: Upload coverage reports
         if: matrix.python-version == '3.11'
