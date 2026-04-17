@@ -123,7 +123,7 @@ def download_binary(version: str) -> Path:
     console.print(f"[cyan]Downloading CapiscIO Core v{version} for {os_name}/{arch_name}...[/cyan]")
     
     try:
-        with requests.get(url, stream=True) as r:
+        with requests.get(url, stream=True, timeout=60) as r:
             r.raise_for_status()
             total_size = int(r.headers.get('content-length', 0))
             
@@ -144,11 +144,11 @@ def download_binary(version: str) -> Path:
         
         # Verify checksum BEFORE making executable (security: validate before trust)
         #
-        # CAPISCIO_REQUIRE_CHECKSUM env var controls strict verification:
-        #   When set to "1", "true", or "yes", the download will fail if
-        #   checksums.txt cannot be fetched OR the binary entry is missing.
-        #   When unset/false, a warning is logged but the binary is still used.
-        require_checksum = os.environ.get("CAPISCIO_REQUIRE_CHECKSUM", "").lower() in ("1", "true", "yes")
+        # CAPISCIO_SKIP_CHECKSUM env var controls strict verification:
+        #   When set to "1", "true", or "yes", checksum verification is skipped
+        #   with a warning. By default, verification is required and will fail
+        #   if checksums.txt cannot be fetched or the binary entry is missing.
+        skip_checksum = os.environ.get("CAPISCIO_SKIP_CHECKSUM", "").lower() in ("1", "true", "yes")
         expected_hash, checksum_status = _fetch_expected_checksum(version, target_path.name)
         if expected_hash is not None:
             if not _verify_checksum(target_path, expected_hash):
@@ -159,30 +159,30 @@ def download_binary(version: str) -> Path:
                     "This may indicate a tampered or corrupted download."
                 )
             logger.info(f"Checksum verified for {target_path.name}")
-        elif require_checksum:
-            target_path.unlink()
-            if checksum_status == "fetch_failed":
-                raise RuntimeError(
-                    f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
-                    f"but checksums.txt could not be fetched for v{version}. "
-                    "Cannot verify binary integrity."
-                )
-            else:
-                raise RuntimeError(
-                    f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
-                    f"but no checksum entry found for {target_path.name} in v{version} checksums.txt. "
-                    "Cannot verify binary integrity."
-                )
-        else:
+        elif skip_checksum:
             if checksum_status == "fetch_failed":
                 logger.warning(
                     "Could not verify binary integrity (checksums.txt not available). "
-                    "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
+                    "Skipping verification (CAPISCIO_SKIP_CHECKSUM=true)."
                 )
             else:
                 logger.warning(
                     f"Could not verify binary integrity (no entry for {target_path.name} in checksums.txt). "
-                    "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
+                    "Skipping verification (CAPISCIO_SKIP_CHECKSUM=true)."
+                )
+        else:
+            target_path.unlink()
+            if checksum_status == "fetch_failed":
+                raise RuntimeError(
+                    f"Checksum verification failed: checksums.txt could not be fetched for v{version}. "
+                    "Cannot verify binary integrity. "
+                    "Set CAPISCIO_SKIP_CHECKSUM=true to bypass."
+                )
+            else:
+                raise RuntimeError(
+                    f"Checksum verification failed: no entry for {target_path.name} in v{version} checksums.txt. "
+                    "Cannot verify binary integrity. "
+                    "Set CAPISCIO_SKIP_CHECKSUM=true to bypass."
                 )
 
         # Make executable only after checksum verification passes

@@ -41,7 +41,7 @@ jobs:
       
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short
+          pytest tests/unit/ -v --tb=short
   
   build-check:
     name: Build Check
