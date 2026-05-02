@@ -59,6 +59,18 @@ The Python wrapper includes specific commands to manage the binary:
 - **Linux**: AMD64, ARM64
 - **Windows**: AMD64
 
+## Binary Integrity Verification
+
+On first run, the wrapper downloads the capiscio-core binary and verifies its SHA-256 checksum
+against the published `checksums.txt` from the GitHub release.
+
+If verification fails or the checksums file is unavailable:
+
+```bash
+# Temporary bypass (not recommended for production)
+export CAPISCIO_SKIP_CHECKSUM=true
+```
+
 ## Troubleshooting
 
 **"Permission denied" errors:**
@@ -69,6 +81,10 @@ capiscio --wrapper-clean
 
 **"Binary not found" or download errors:**
 If you are behind a corporate firewall, ensure you can access `github.com`.
+
+**Checksum verification failures:**
+If you see "Checksum verification failed", the binary integrity could not be confirmed.
+This can happen with pre-release versions or network issues. See the [Binary Integrity Verification](#binary-integrity-verification) section above.
 
 ## License
 
