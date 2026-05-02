@@ -64,10 +64,18 @@ The Python wrapper includes specific commands to manage the binary:
 On first run, the wrapper downloads the capiscio-core binary and verifies its SHA-256 checksum
 against the published `checksums.txt` from the GitHub release.
 
-If verification fails or the checksums file is unavailable:
+Two failure modes exist:
+
+1. **Checksum mismatch** ("Binary integrity check failed"): The downloaded file does not match
+   the published checksum. This indicates tampering or corruption and **cannot be bypassed**.
+   Delete the cached binary and retry.
+
+2. **Checksums unavailable** ("checksums.txt could not be fetched" or "no entry for …"):
+   The checksums file could not be downloaded or does not contain an entry for the platform
+   binary. This can happen with pre-release versions or network issues. To bypass:
 
 ```bash
-# Temporary bypass (not recommended for production)
+# Bypass only when checksums.txt is unavailable (not for mismatches)
 export CAPISCIO_SKIP_CHECKSUM=true
 ```
 
@@ -82,9 +90,15 @@ capiscio --wrapper-clean
 **"Binary not found" or download errors:**
 If you are behind a corporate firewall, ensure you can access `github.com`.
 
-**Checksum verification failures:**
-If you see "Checksum verification failed", the binary integrity could not be confirmed.
-This can happen with pre-release versions or network issues. See the [Binary Integrity Verification](#binary-integrity-verification) section above.
+**"Binary integrity check failed":**
+The downloaded binary does not match the published checksum — this may indicate a corrupted
+or tampered download. Delete the cached binary (`capiscio --wrapper-clean`) and retry.
+This error **cannot** be bypassed with `CAPISCIO_SKIP_CHECKSUM`.
+
+**"Checksum verification failed: checksums.txt could not be fetched":**
+The checksums file is unavailable (network issue or pre-release version). You can set
+`CAPISCIO_SKIP_CHECKSUM=true` to proceed without verification, but only do this in
+development environments.
 
 ## License
 
