@@ -47,7 +47,7 @@ capiscio = "capiscio.cli:main"
 
 [project.urls]
 Homepage = "https://capisc.io"
-Documentation = "https://docs.capisc.io/cli"
+Documentation = "https://docs.capisc.io/reference/wrappers/python/"
 Repository = "https://github.com/capiscio/capiscio-python"
 Issues = "https://github.com/capiscio/capiscio-python/issues"
 
