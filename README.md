@@ -1,17 +1,15 @@
-# CapiscIO CLI (Python)
+# CapiscIO CLI
 
-**The official command-line interface for CapiscIO, the Agent-to-Agent (A2A) validation platform.**
+Catch bad agents before your users do.
 
 [![PyPI version](https://badge.fury.io/py/capiscio.svg)](https://badge.fury.io/py/capiscio)
 [![Python Versions](https://img.shields.io/pypi/pyversions/capiscio.svg)](https://pypi.org/project/capiscio/)
 [![License](https://img.shields.io/github/license/capiscio/capiscio-python)](https://github.com/capiscio/capiscio-python/blob/main/LICENSE)
 [![Downloads](https://pepy.tech/badge/capiscio)](https://pepy.tech/project/capiscio)
 
-## Overview
+**CapiscIO CLI** validates A2A agent cards, tests live endpoints, and blocks broken deployments — one command in your pipeline.
 
-This package provides a convenient Python distribution for the **CapiscIO CLI**. It acts as a smart wrapper that automatically manages the underlying `capiscio-core` binary (written in Go), ensuring you always have the correct executable for your operating system and architecture.
-
-> **Note:** This is a wrapper. The core logic resides in [capiscio-core](https://github.com/capiscio/capiscio-core).
+> CLI secures your pipeline. [Agent Guard](https://github.com/capiscio/capiscio-sdk-python) secures your runtime.
 
 ## Installation
 
@@ -19,39 +17,74 @@ This package provides a convenient Python distribution for the **CapiscIO CLI**.
 pip install capiscio
 ```
 
-## Usage
+Also available via npm: `npm install -g capiscio`
 
-Once installed, the `capiscio` command is available in your terminal. It passes all arguments directly to the core binary.
+## Quick Start
 
 ```bash
-# Validate an agent
+# Validate an agent card (local file or URL)
+capiscio validate ./agent-card.json
+
+# Validate a live agent endpoint
 capiscio validate https://my-agent.example.com
 
-# Validate with JSON output
+# JSON output for CI pipelines
 capiscio validate https://my-agent.example.com --json
 
-# Check version
-capiscio --version
+# Strict mode — fail on warnings too
+capiscio validate ./agent-card.json --strict
 ```
+
+## What It Checks
+
+| Check | Description |
+|-------|-------------|
+| **Schema** | Agent card conforms to A2A specification |
+| **Signatures** | JWS badge signatures are valid |
+| **Endpoints** | Live agent responds correctly (`--test-live`) |
+| **Trust Level** | Badge trust level meets your threshold |
+
+## Use Cases
+
+- **Pre-commit hooks** — Validate agent cards before you push
+- **CI/CD gates** — Block deployments with misconfigured agents ([GitHub Action](https://github.com/capiscio/validate-a2a))
+- **Vendor due diligence** — Validate third-party agents before integration
+- **Cron monitoring** — Continuous health checks on agent endpoints
+
+## Dev & Testing Commands
+
+The CLI also exposes badge and key management commands for local development and testing:
+
+```bash
+# Issue a self-signed badge (dev/testing only)
+capiscio badge issue --self-sign
+
+# Verify a badge
+capiscio badge verify "$TOKEN"
+
+# Generate a key pair
+capiscio key gen
+
+# Start the gateway sidecar
+capiscio gateway start --port 8080 --target http://localhost:3000
+```
+
+For full CLI reference, see the [capiscio-core documentation](https://github.com/capiscio/capiscio-core#cli-reference).
 
 ### Wrapper Utilities
 
-The Python wrapper includes specific commands to manage the binary:
-
 | Command | Description |
 |---------|-------------|
-| `capiscio --wrapper-version` | Display the version of this Python wrapper package. |
-| `capiscio --wrapper-clean` | Remove the cached `capiscio-core` binary (forces re-download on next run). |
+| `capiscio --wrapper-version` | Display the version of this Python wrapper package |
+| `capiscio --wrapper-clean` | Remove the cached binary (forces re-download on next run) |
 
 ## How It Works
 
-1.  **Detection**: When you run `capiscio`, the script detects your OS (Linux, macOS, Windows) and Architecture (AMD64, ARM64).
-2.  **Provisioning**: It checks if the correct `capiscio-core` binary is present in your user cache.
-    *   *Linux*: `~/.cache/capiscio/bin`
-    *   *macOS*: `~/Library/Caches/capiscio/bin`
-    *   *Windows*: `%LOCALAPPDATA%\capiscio\bin`
-3.  **Download**: If missing, it securely downloads the release from GitHub.
-4.  **Execution**: It seamlessly replaces the Python process with the Go binary, ensuring zero overhead during execution.
+This package is a lightweight Python wrapper around [capiscio-core](https://github.com/capiscio/capiscio-core) (written in Go). On first run it downloads the correct binary for your platform — zero overhead after that.
+
+1. **Detects** your OS (Linux, macOS, Windows) and architecture (AMD64, ARM64)
+2. **Downloads** the binary to your user cache (with SHA-256 checksum verification)
+3. **Replaces** the Python process with the Go binary — native speed, no shim
 
 ## Supported Platforms
 
@@ -103,3 +136,13 @@ development environments.
 ## License
 
 Apache-2.0
+
+## Related Packages
+
+| Package | What it does | Install |
+|---------|-------------|---------|
+| [Agent Guard](https://github.com/capiscio/capiscio-sdk-python) | Runtime trust verification for A2A agents | `pip install capiscio-sdk` |
+| [MCP Guard](https://github.com/capiscio/capiscio-mcp-python) | Trust enforcement for MCP tool servers | `pip install capiscio-mcp` |
+| [capiscio-core](https://github.com/capiscio/capiscio-core) | Go library and full CLI reference | `go install` |
+
+[Documentation](https://docs.capisc.io) · [Website](https://capisc.io) · [Platform](https://app.capisc.io)
